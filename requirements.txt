@@ -1,3 +1,7 @@
 numpy
 scikit-learn
 sentence-transformers
+fastapi
+uvicorn
+pdfplumber
+pypdf

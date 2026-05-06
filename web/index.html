@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RAKA | Academic Assistant</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+
+    <main class="shell">
+      <header class="hero">
+        <div class="badge">RAKA</div>
+        <h1>Academic answers, delivered with clarity.</h1>
+        <p>
+          Ask anything about SPIT regulations, syllabus, policies, and reports.
+          Your responses come strictly from the indexed documents.
+        </p>
+      </header>
+
+      <section class="chat">
+        <div id="chatLog" class="chat-log" aria-live="polite"></div>
+
+        <form id="chatForm" class="chat-form" autocomplete="off">
+          <input
+            id="questionInput"
+            type="text"
+            name="question"
+            placeholder="Ask about attendance, fees, electives, or policies..."
+            maxlength="800"
+            required
+          />
+          <button type="submit" class="send-btn">Send</button>
+        </form>
+      </section>
+
+      <footer class="meta">
+        <div class="pill">Grounded responses - Source-cited</div>
+        <div class="pill">RAG + LLM - Groq/OpenAI fallback</div>
+      </footer>
+    </main>
+  </body>
+</html>

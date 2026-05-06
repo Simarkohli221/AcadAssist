@@ -7,8 +7,8 @@ venv/
 
 .vscode/
 
-data/processed/
-data/raw_pdfs/
+processed/
+raw_pdfs/
 
 *.pkl
 *.npy
