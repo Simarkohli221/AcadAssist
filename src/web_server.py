@@ -20,7 +20,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from retriever import Retriever
 from generator import Generator
-from query_normalizer import normalize_query
+from query_normalizer import (
+    normalize_query,
+    classify_query_category,
+    get_category_sources,
+)
 from reranker import get_reranker
 
 logger = logging.getLogger("raka.web")
@@ -112,9 +116,11 @@ def chat(payload: ChatRequest) -> ChatResponse:
         )
 
     normalized_query = normalize_query(question)
+    category = classify_query_category(normalized_query)
+    allowed_sources = get_category_sources(category)
 
-    results = retriever.retrieve(normalized_query, k=7)
-    results = reranker.rerank(normalized_query, results, top_k=7)
+    results = retriever.retrieve(normalized_query, k=10, allowed_sources=allowed_sources)
+    results = reranker.rerank(normalized_query, results, top_k=3)
 
     response = generator.generate(normalized_query, results)
 

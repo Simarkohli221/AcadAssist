@@ -129,6 +129,7 @@ _CATEGORY_RULES: list[tuple[str, list[str], list[str]]] = [
             "ese", "reexam", "re-exam", "special exam", "median", "marks",
             "percentage", "backlog", "semester result", "open house",
             "re-registration", "registration", "grading", "relative grading",
+            "nptel",
         ],
     ),
     (
@@ -136,10 +137,10 @@ _CATEGORY_RULES: list[tuple[str, list[str], list[str]]] = [
         ["cse-syllabus", "cse_syllabus", "syllabus", "curriculum"],
         [
             "syllabus", "course", "subject", "semester", "module", "unit",
-            "credit hour", "teaching scheme", "elective", "minor", "nptel",
+            "credit hour", "teaching scheme", "elective", "minor",
             "lecture", "tutorial", "lab", "practical", "course code",
             "curriculum", "textbook", "reference", "outcomes", "prerequisite",
-            "multidisciplinary", "open elective", "hss", "llc",
+            "multidisciplinary", "open elective", "hss", "llc", "offered",
         ],
     ),
     (
@@ -169,6 +170,12 @@ def classify_query_category(query: str) -> str:
     Category string. "general" means search all documents.
     """
     lower = query.lower()
+
+    # High-priority domain override:
+    # NPTEL operational/re-registration/exam rules reside in examination.pdf.
+    # Must take precedence over generic syllabus terms (e.g. "course", "subject").
+    if "nptel" in lower:
+        return "examination"
 
     # Score each category by keyword hits
     scores: dict[str, int] = {}

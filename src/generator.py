@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 import urllib.request
 import urllib.error
@@ -105,6 +106,18 @@ class GeneratorResponse:
 
 
 # ── Context builder ───────────────────────────────────────────────────────────
+def _clean_chunk_text_preserve_lines(text: str) -> str:
+    """
+    Clean chunk text for LLM generation while preserving newline and table row boundaries.
+    """
+    if not text:
+        return ""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in text.split("\n")]
+    cleaned = "\n".join(lines)
+    return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+
+
 def _build_context_block(chunks: list[RetrievalResult]) -> str:
     """
     Build the context string from retrieved chunks.
@@ -112,6 +125,7 @@ def _build_context_block(chunks: list[RetrievalResult]) -> str:
     v3 Fix: previously only included ~2000 chars of the first chunk.
     Now includes ALL chunks up to MAX_CONTEXT_CHARS, distributing space fairly.
     Each chunk has a full header so the LLM can cite sources accurately.
+    Preserves newlines and table rows so structured tables and lists remain readable.
     """
     parts = []
     total_chars = 0
@@ -123,16 +137,16 @@ def _build_context_block(chunks: list[RetrievalResult]) -> str:
             f"| Pages: {chunk.page_start}-{chunk.page_end} "
             f"| Section: {chunk.section[:60]}]"
         )
-        body = clean_text(chunk.text)
+        body = _clean_chunk_text_preserve_lines(chunk.text)
 
         # Allocate chars fairly; always include at least one meaningful excerpt
         alloc = max(chars_per_chunk, 800)
         body_trimmed = body[:alloc]
         if len(body) > alloc:
-            # Try to cut at sentence boundary
-            last_period = body_trimmed.rfind(". ")
-            if last_period > alloc // 2:
-                body_trimmed = body_trimmed[:last_period + 1]
+            # Try to cut at newline or sentence boundary
+            last_boundary = max(body_trimmed.rfind("\n"), body_trimmed.rfind(". "))
+            if last_boundary > alloc // 2:
+                body_trimmed = body_trimmed[:last_boundary + 1]
 
         entry = f"{header}\n{body_trimmed}\n\n"
 

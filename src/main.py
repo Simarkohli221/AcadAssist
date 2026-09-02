@@ -139,14 +139,15 @@ def run_query(
     # ── Retrieval ───────────────────────────────────────
     results = retriever.retrieve(
         normalized_query,
-        k=k,
+        k=10,
+        allowed_sources=allowed_sources,
     )
 
     # ── Reranking ───────────────────────────────────────
     results = reranker.rerank(
         normalized_query,
         results,
-        top_k=k,
+        top_k=3,
     )
 
     if verbose and results:

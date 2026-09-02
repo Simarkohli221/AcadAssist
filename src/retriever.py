@@ -253,12 +253,14 @@ class Retriever:
         k:               int   = 7,
         score_threshold: float = -0.1,
         use_hybrid:      bool  = True,
+        allowed_sources: list[str] | None = None,
     ) -> list[RetrievalResult]:
         """
         Retrieve top-k most relevant chunks for a query.
 
         v3: defaults to hybrid (BM25 + dense) retrieval via RRF.
         Falls back to dense-only if use_hybrid=False.
+        Supports category-aware source filtering/prioritization via allowed_sources.
 
         Parameters
         ──────────
@@ -266,6 +268,8 @@ class Retriever:
         k               : number of chunks to return (default 7, was 5)
         score_threshold : discard results below this RRF score (default -0.1)
         use_hybrid      : True = BM25 + dense fusion; False = dense only
+        allowed_sources : optional list of document stems (e.g. ['examination', 'exam'])
+                          to filter/prioritize matching chunks.
 
         Returns
         ───────
@@ -277,31 +281,45 @@ class Retriever:
             raise ValueError(f"retrieve: k must be positive, got {k}")
 
         if use_hybrid:
-            return self._retrieve_hybrid(query, k, score_threshold)
+            return self._retrieve_hybrid(query, k, score_threshold, allowed_sources=allowed_sources)
         else:
-            return self._retrieve_dense(query, k, score_threshold)
+            return self._retrieve_dense(query, k, score_threshold, allowed_sources=allowed_sources)
 
     def _retrieve_dense(
         self,
         query:           str,
         k:               int,
         score_threshold: float,
+        allowed_sources: list[str] | None = None,
     ) -> list[RetrievalResult]:
-        """Dense-only SBERT retrieval (original behaviour)."""
+        """Dense-only SBERT retrieval with optional allowed_sources prioritization."""
         query_vector = self._embedder.encode_query(query)
-        raw_results  = self._store.search(query_vector, k=k)
+        search_k = min(max(k * 3, 30), self._store.ntotal) if allowed_sources else k
+        raw_results  = self._store.search(query_vector, k=search_k)
 
-        results: list[RetrievalResult] = []
+        matching_results: list[RetrievalResult] = []
+        other_results: list[RetrievalResult] = []
+
         for raw in raw_results:
             score = raw.get("score", 0.0)
             if score < score_threshold:
                 continue
-            results.append(self._make_result(raw, score))
+            res = self._make_result(raw, score)
+            if allowed_sources and any(stem.lower() in res.source.lower() for stem in allowed_sources):
+                matching_results.append(res)
+            else:
+                other_results.append(res)
+
+        if allowed_sources:
+            results = (matching_results + other_results)[:k]
+        else:
+            results = other_results[:k]
 
         logger.info(
-            "retrieve_dense('%s'): %d results (top score=%.4f)",
+            "retrieve_dense('%s'): %d results (top score=%.4f, category_filter=%s)",
             query[:60], len(results),
             results[0].score if results else 0.0,
+            bool(allowed_sources),
         )
         return results
 
@@ -310,22 +328,26 @@ class Retriever:
         query:           str,
         k:               int,
         score_threshold: float,
+        allowed_sources: list[str] | None = None,
     ) -> list[RetrievalResult]:
         """
         Hybrid BM25 + dense retrieval fused via Reciprocal Rank Fusion.
 
         Steps:
-        1. BM25 top-20 ranked list
-        2. Dense (SBERT) top-20 ranked list
-        3. RRF merge → top-k
+        1. BM25 ranking list (top-30 if category filter active, else top-20)
+        2. Dense (SBERT) ranking list (top-30 if category filter active, else top-20)
+        3. RRF merge
+        4. Prioritize/filter to allowed_sources if provided → top-k
         """
+        pool_k = min(max(k * 3, 30), len(self._chunks)) if allowed_sources else 20
+
         # --- BM25 ranking ---
-        bm25_ranked = self._bm25.score(query, top_k=20)
+        bm25_ranked = self._bm25.score(query, top_k=pool_k)
 
         # --- Dense ranking ---
         query_vector  = self._embedder.encode_query(query)
-        # Retrieve more candidates for fusion
-        dense_raw     = self._store.search(query_vector, k=min(20, self._store.ntotal))
+        # Retrieve candidates for fusion
+        dense_raw     = self._store.search(query_vector, k=min(pool_k, self._store.ntotal))
         # Map chunk_id → position in dense results
         dense_ranked: list[tuple[int, float]] = []
         for raw in dense_raw:
@@ -336,22 +358,41 @@ class Retriever:
         # --- RRF fusion ---
         fused = _rrf(dense_ranked, bm25_ranked, k=60)
 
-        # Build results from top-k fused indices
-        results: list[RetrievalResult] = []
-        for chunk_idx, rrf_score in fused[:k]:
+        # Separate candidates into matching category sources vs others
+        matching_fused: list[tuple[int, float]] = []
+        other_fused: list[tuple[int, float]] = []
+
+        for chunk_idx, rrf_score in fused:
             if chunk_idx < 0 or chunk_idx >= len(self._chunks):
                 continue
+            chunk = self._chunks[chunk_idx]
+            source = chunk.get("source", "").lower()
+            if allowed_sources and any(stem.lower() in source for stem in allowed_sources):
+                matching_fused.append((chunk_idx, rrf_score))
+            else:
+                other_fused.append((chunk_idx, rrf_score))
+
+        # Prioritize matching sources first; fall back to others if needed to reach k
+        if allowed_sources:
+            target_fused = (matching_fused + other_fused)[:k]
+        else:
+            target_fused = fused[:k]
+
+        # Build results from selected fused indices
+        results: list[RetrievalResult] = []
+        for chunk_idx, rrf_score in target_fused:
             chunk = self._chunks[chunk_idx]
             results.append(self._make_result(chunk, rrf_score))
 
         logger.info(
             "retrieve_hybrid('%s'): %d results "
-            "(dense=%d, bm25=%d, fused=%d, returned=%d)",
+            "(dense=%d, bm25=%d, fused=%d, matching=%d, returned=%d)",
             query[:60],
             len(results),
             len(dense_ranked),
             len(bm25_ranked),
             len(fused),
+            len(matching_fused),
             len(results),
         )
         for i, r in enumerate(results[:3]):

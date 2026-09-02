@@ -61,7 +61,7 @@ class CrossEncoderReranker:
         if not results:
             return results
 
-        pairs = [(query, r.text[:500]) for r in results]
+        pairs = [(query, r.text) for r in results]
         scores = self._model.predict(pairs)  # (n,) float array
 
         ranked = sorted(
@@ -112,7 +112,7 @@ class CosineReranker:
         query_vec = self._embedder.encode_query(query)  # (1, d)
 
         # Encode all chunk texts
-        texts = [r.text[:500] for r in results]
+        texts = [r.text for r in results]
         chunk_vecs = self._embedder.encode_texts(texts)  # (n, d)
 
         # Cosine similarity (vectors already L2-normalised → inner product = cosine)

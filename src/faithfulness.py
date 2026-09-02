@@ -139,33 +139,147 @@ def _content_words(text: str) -> set[str]:
     return {t for t in tokens if len(t) > 2 and t not in _STOPWORDS}
 
 
+def _normalize_text_numbers(text: str) -> str:
+    """
+    Normalize numbers and symbols in text:
+    1. Normalizes Unicode spaces (NBSP, narrow NBSP) and Unicode hyphens/dashes.
+    2. Removes commas within digits (e.g. 5,000 -> 5000, 10,000 -> 10000).
+    3. Normalizes percentage whitespace (e.g. "50 %" -> "50%", "< 50 %" -> "<50%").
+    4. Expands range percentages (e.g. "50-65%" or "50 % – 65 %" -> "50%-65%").
+    5. Ignores citation references (Pages 7-8, pp. 14-17, Section 3.1, Source 1)
+       so page/section indices are not treated as factual numeric claims.
+    6. Normalizes common abbreviations before clause splitting (e.g. Rs. -> Rs).
+    """
+    if not text:
+        return ""
+    # 1. Unicode whitespace & dashes
+    t = (
+        text.replace("\u00a0", " ")
+        .replace("\u202f", " ")
+        .replace("\u200b", "")
+        .replace("\u2011", "-")
+        .replace("\u2013", "-")
+        .replace("\u2014", "-")
+    )
+    # 2. Strip bracketed citation blocks: 【Source ...】 or [Source ...]
+    t = re.sub(r"[【\[]\s*Source\b[^】\]]*[】\]]", "", t, flags=re.I)
+    # 3. Comma in numbers: 5,000 -> 5000
+    t = re.sub(r"(?<=\d),(?=\d)", "", t)
+    # 4. Space in thousands: 8 000 -> 8000
+    t = re.sub(r"(?<=\d)[\s](?=\d{3}\b)", "", t)
+    # 5. Percentage whitespace: "50 %" -> "50%"
+    t = re.sub(r"(\d+)\s+%", r"\1%", t)
+    t = re.sub(r"<\s*(\d+)%", r"<\1%", t)
+    t = re.sub(r">\s*(\d+)%", r">\1%", t)
+    # 6. Expand range percentages: "50-65%" or "50% - 65%" -> "50%-65%"
+    t = re.sub(r"(\d+)%?\s*[-–]\s*(\d+)%", r"\1%-\2%", t)
+    t = re.sub(r"\b(\d+)%?\s+to\s+(\d+)%", r"\1% to \2%", t)
+    # 7. Ignore citation references (page ranges, sections, source tags)
+    t = re.sub(r"\b(?:pages?|pp\.?|p\.)\s*\d+(?:\s*[-–to]+\s*\d+)?\b", "", t, flags=re.I)
+    t = re.sub(r"\b(?:section|sec\.?)\s*\d+(?:\.\d+)?\b", "", t, flags=re.I)
+    t = re.sub(r"\[?\bSource\s+\d+\]?", "", t, flags=re.I)
+    # 8. Guard abbreviations
+    t = re.sub(r"\bRs\.\s*", "Rs ", t)
+    t = re.sub(r"\bpp\.\s*", "pp ", t)
+    t = re.sub(r"\bsec\.\s*", "sec ", t)
+    t = re.sub(r"\bno\.\s*", "no ", t)
+    return t
+
+
 def _numeric_tokens(text: str) -> set[str]:
     """
     Extract normalised numeric tokens from text.
 
-    Handles: integers, decimals, percentages, 4-digit years, and
-    2-digit academic-year ranges (e.g. "2024-25").
-
-    Normalisation: a bare percentage value and its non-percent numeral are
-    treated as the SAME token only when it's the identical run of digits
-    from the SAME match (i.e. "75%" -> "75"); we do NOT equate "75%" with
-    a separately-occurring standalone "75" elsewhere for a *different*
-    quantity — that would risk false "consistency". We simply strip a
-    trailing "%" for the purpose of set membership, which is a deliberate,
-    documented simplification: it lets "75%" in the answer match "75%" (or
-    even "75 percent" written as "75") in the context, while still keeping
-    distinct numeric values (75 vs 85) distinct.
-
-    Limitation (documented): month names are not parsed, so a date written
-    as "15 September" contributes only the numeral "15" — a hallucinated
-    month attached to a correct day number will NOT be caught by this
-    feature alone (semantic_similarity / keyword_jaccard partially cover
-    this gap, since the month name itself is a content word).
+    Handles: integers (with/without commas, e.g. 5,000 -> 5000), decimals,
+    percentages (50%, 65%), 4-digit years, and 2-digit academic-year ranges.
+    Preserves percentage markers to distinguish rates from bare counts.
     """
     if not text:
         return set()
-    raw = _NUMERIC_RE.findall(text)
-    return {tok.rstrip("%") for tok in raw}
+    cleaned = _normalize_text_numbers(text)
+    raw = _NUMERIC_RE.findall(cleaned)
+    return set(raw)
+
+
+def _extract_condition_rules(text: str) -> dict[str, dict[str, set[str]]]:
+    """
+    Extract condition -> {fees: set(), exams: set()} mappings from text clauses.
+    Covers attendance thresholds (<50%, 50-65%, 65-75%, >=75%) and their
+    associated fees and examination types.
+    """
+    cleaned = _normalize_text_numbers(text)
+    # Join line wraps that occur mid-sentence within paragraphs
+    flat = re.sub(r"(?<![.;●\n])\n(?![●\n])", " ", cleaned)
+    clauses = [c.strip() for c in re.split(r"[.;●]|\n{2,}|\band\s+(?=students|if|detained)", flat, flags=re.I) if c.strip()]
+
+    cond_map: dict[str, dict[str, set[str]]] = {}
+    for clause in clauses:
+        cond = None
+        if re.search(r"<\s*50%|below\s+50%|less\s+than\s+50%|under\s+50%", clause, re.I):
+            cond = "<50%"
+        elif re.search(r"50%?-65%|50%\s*to\s*65%|between\s+50%?\s*and\s*65%", clause, re.I):
+            cond = "50-65%"
+        elif re.search(r"65%?-75%|65%\s*to\s*75%|between\s+65%?\s*and\s*75%", clause, re.I):
+            cond = "65-75%"
+        elif re.search(r">=?\s*75%|at\s+least\s+75%|75%\s+attendance", clause, re.I):
+            cond = ">=75%"
+
+        if not cond:
+            continue
+
+        if cond not in cond_map:
+            cond_map[cond] = {"fees": set(), "exams": set()}
+
+        fee_matches = re.findall(r"(?:rs|₹|inr|fees?[:\s]*)\s*(\d+)", clause, re.I)
+        if not fee_matches and re.search(r"\bfee\b|\bcost\b|\bcharges?\b", clause, re.I):
+            fee_matches = [m for m in _NUMERIC_RE.findall(clause) if not m.endswith("%") and len(m) >= 3]
+
+        for f in fee_matches:
+            cond_map[cond]["fees"].add(f)
+
+        if re.search(r"special\s+exam(?:ination)?", clause, re.I):
+            cond_map[cond]["exams"].add("special_exam")
+        elif re.search(r"re-?exam(?:ination)?", clause, re.I):
+            cond_map[cond]["exams"].add("re_exam")
+
+    return cond_map
+
+
+def _check_condition_value_contradiction(answer: str, context: str) -> bool:
+    """
+    Lightweight rule-based check for condition/value cross-attribution contradictions.
+    Returns True if the answer binds a condition (e.g. <50% attendance) to a fee or
+    exam type that contradicts the rules for that condition specified in the context.
+    """
+    ans_rules = _extract_condition_rules(answer)
+    if not ans_rules:
+        return False
+    ctx_rules = _extract_condition_rules(context)
+    if not ctx_rules:
+        return False
+
+    for cond, ans_data in ans_rules.items():
+        if cond in ctx_rules:
+            ctx_data = ctx_rules[cond]
+            # Check fee conflict: if answer claims fees for this condition, do they match context for this condition?
+            if ans_data["fees"] and ctx_data["fees"]:
+                unmatched_fees = ans_data["fees"] - ctx_data["fees"]
+                if unmatched_fees:
+                    logger.warning(
+                        "Condition/fee contradiction detected: condition %s claimed fees %s, context allows %s",
+                        cond, ans_data["fees"], ctx_data["fees"],
+                    )
+                    return True
+            # Check exam type conflict
+            if ans_data["exams"] and ctx_data["exams"]:
+                unmatched_exams = ans_data["exams"] - ctx_data["exams"]
+                if unmatched_exams:
+                    logger.warning(
+                        "Condition/exam contradiction detected: condition %s claimed exams %s, context allows %s",
+                        cond, ans_data["exams"], ctx_data["exams"],
+                    )
+                    return True
+    return False
 
 
 # ── Embedder loading (lazy, cached, reused where possible) ───────────────────
@@ -379,8 +493,24 @@ class FaithfulnessVerifier:
         if not context_nums:
             return 0.0
 
-        matched = sum(1 for n in answer_nums if n in context_nums)
-        return matched / len(answer_nums)
+        # Condition/value contradiction check (e.g. attaching 50-65% fee to <50% attendance)
+        if _check_condition_value_contradiction(answer, context):
+            return 0.0
+
+        matched = {n for n in answer_nums if n in context_nums}
+        unmatched = answer_nums - context_nums
+
+        # Direct contradiction on fee / quantitative amounts:
+        # A 3+ digit number in the answer not present in context is an ungrounded quantity
+        fee_like_unmatched = [n for n in unmatched if re.match(r"^\d{3,}$", n)]
+        if fee_like_unmatched:
+            return 0.0
+
+        if unmatched:
+            # Heavily penalize any unmatched numbers so prompt numbers can't mask an incorrect number
+            return max(0.0, (len(matched) - 2 * len(unmatched)) / len(answer_nums))
+
+        return 1.0
 
     # ── Combined feature extraction ──────────────────────────────────────
     def extract_features(self, answer: str, context: str) -> FeatureResult:

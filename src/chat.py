@@ -7,6 +7,7 @@ from faithfulness import FaithfulnessVerifier
 from query_normalizer import (
     normalize_query,
     classify_query_category,
+    get_category_sources,
 )
 
 from reranker import get_reranker
@@ -73,29 +74,29 @@ while True:
     category = classify_query_category(
         normalized_query
     )
+    allowed_sources = get_category_sources(category)
 
     print(f"\n[Normalized] {normalized_query}")
     print(f"[Category]   {category}")
 
-
     # -----------------------------------------------------
-    # 2. Retrieve relevant chunks
+    # 2. Retrieve relevant chunks (candidate set k=10)
     # -----------------------------------------------------
 
     results = retriever.retrieve(
         normalized_query,
-        k=5,
+        k=10,
+        allowed_sources=allowed_sources,
     )
 
-
     # -----------------------------------------------------
-    # 3. Rerank retrieved chunks
+    # 3. Rerank retrieved chunks (best 3 chunks)
     # -----------------------------------------------------
 
     results = reranker.rerank(
         normalized_query,
         results,
-        top_k=5,
+        top_k=3,
     )
 
 
@@ -117,9 +118,10 @@ while True:
     # that was provided to the generator.
     # -----------------------------------------------------
 
-    context = "\n\n".join(
-        result.text
-        for result in results
+    context = (
+        response.context_used
+        if response.context_used
+        else "\n\n".join(result.text for result in results)
     )
 
 
