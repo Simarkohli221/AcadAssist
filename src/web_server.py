@@ -32,7 +32,7 @@ logging.basicConfig(
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 WEB_DIR = APP_ROOT / "web"
-DEFAULT_INDEX_DIR = APP_ROOT / "processed"
+DEFAULT_INDEX_DIR = APP_ROOT / "data" / "processed"
 INDEX_DIR = Path(os.getenv("RAKA_INDEX_DIR", DEFAULT_INDEX_DIR))
 
 app = FastAPI(title="RAKA Web", version="1.0.0")

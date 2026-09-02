@@ -1,17 +1,93 @@
+# ============================================================
+# RAKA / AcadAssist - Git Ignore
+# ============================================================
+
+# -------------------------
+# Python
+# -------------------------
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
 
-.env
-venv/
+# Python virtual environments
 .venv/
+venv/
+env/
 
+# -------------------------
+# Environment variables / secrets
+# -------------------------
+.env
+.env.*
+!.env.example
+
+# -------------------------
+# Jupyter / Python tooling
+# -------------------------
+.ipynb_checkpoints/
+
+# -------------------------
+# Node / React
+# -------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# -------------------------
+# Frontend build output
+# -------------------------
+dist/
+build/
+.cache/
+.parcel-cache/
+
+# -------------------------
+# IDE
+# -------------------------
 .vscode/
+.idea/
 
-processed/
-raw_pdfs/
-
-*.pkl
-*.npy
-*.index
-
+# -------------------------
+# OS
+# -------------------------
 .DS_Store
+Thumbs.db
+
+# -------------------------
+# Python generated files
+# -------------------------
+*.pyc
+*.pyo
+*.pyd
+
+# -------------------------
+# ML / vector-store generated artifacts
+# -------------------------
+*.npy
+*.pkl
+*.joblib
+*.faiss
+
+# Specific FAISS index filename
+data/processed/faiss.index
+
+# -------------------------
+# Logs
+# -------------------------
+*.log
+
+# -------------------------
+# Large source PDFs
+# -------------------------
+data/raw_pdfs/annual-activity-report.pdf
+data/raw_pdfs/annual-report.pdf
+
+# -------------------------
+# Temporary files
+# -------------------------
+*.tmp
+*.temp
+*.bak
+*.swp
