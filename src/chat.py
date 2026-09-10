@@ -3,14 +3,8 @@ from pathlib import Path
 from retriever import Retriever
 from generator import Generator
 from faithfulness import FaithfulnessVerifier
-
-from query_normalizer import (
-    normalize_query,
-    classify_query_category,
-    get_category_sources,
-)
-
 from reranker import get_reranker
+from pipeline import run_pipeline
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -37,10 +31,15 @@ generator = Generator()
 
 # ---------------------------------------------------------
 # Load Faithfulness Verifier
+#
+# Reuses retriever._embedder (already loaded for retrieval) instead of
+# lazily loading a second SBERT instance, per faithfulness.py's own
+# documented usage guidance.
 # ---------------------------------------------------------
 
 verifier = FaithfulnessVerifier(
     model_path=FAITHFULNESS_MODEL,
+    embedder=retriever._embedder,
     index_dir=INDEX_DIR,
 )
 
@@ -64,125 +63,48 @@ while True:
     if not question:
         continue
 
-
     # -----------------------------------------------------
-    # 1. Normalize query
-    # -----------------------------------------------------
-
-    normalized_query = normalize_query(question)
-
-    category = classify_query_category(
-        normalized_query
-    )
-    allowed_sources = get_category_sources(category)
-
-    print(f"\n[Normalized] {normalized_query}")
-    print(f"[Category]   {category}")
-
-    # -----------------------------------------------------
-    # 2. Retrieve relevant chunks (candidate set k=10)
+    # Run the shared normalize -> retrieve -> rerank ->
+    # generate -> verify pipeline (same code path the web
+    # API uses).
     # -----------------------------------------------------
 
-    results = retriever.retrieve(
-        normalized_query,
-        k=10,
-        allowed_sources=allowed_sources,
-    )
+    result = run_pipeline(question, retriever, reranker, generator, verifier)
+
+    print(f"\n[Normalized] {result.normalized_query}")
+    print(f"[Category]   {result.category}")
 
     # -----------------------------------------------------
-    # 3. Rerank retrieved chunks (best 3 chunks)
-    # -----------------------------------------------------
-
-    results = reranker.rerank(
-        normalized_query,
-        results,
-        top_k=3,
-    )
-
-
-    # -----------------------------------------------------
-    # 4. Generate answer using retrieved context
-    # -----------------------------------------------------
-
-    response = generator.generate(
-        normalized_query,
-        results,
-    )
-
-
-    # -----------------------------------------------------
-    # 5. Build verification context
-    #
-    # IMPORTANT:
-    # This must be the same retrieved chunk text
-    # that was provided to the generator.
-    # -----------------------------------------------------
-
-    context = (
-        response.context_used
-        if response.context_used
-        else "\n\n".join(result.text for result in results)
-    )
-
-
-    # -----------------------------------------------------
-    # 6. Faithfulness verification
-    # -----------------------------------------------------
-
-    verification = verifier.predict(
-        response.answer,
-        context,
-    )
-
-
-    # -----------------------------------------------------
-    # 7. Final answer
+    # Final answer
     # -----------------------------------------------------
 
     print("\nAnswer:\n")
+    print(result.answer)
 
-    if verification["status"] == "unfaithful":
-
-        print(
-            "Unable to verify the answer from "
-            "the available sources."
-        )
-
-    else:
-
-        print(response.answer)
-
-        if verification["status"] == "uncertain":
-
-            print(
-                "\n⚠ Warning: "
-                "The answer may not be fully supported "
-                "by the retrieved sources."
-            )
-
+    if result.warning:
+        print(f"\n⚠ Warning: {result.warning}")
 
     # -----------------------------------------------------
-    # 8. Faithfulness information
+    # Faithfulness information
     # -----------------------------------------------------
 
     print("\nFaithfulness:")
     print(
-        f"Status: {verification['status']}"
+        f"Status: {result.faithfulness_status}"
     )
 
     print(
-        f"Score:  {verification['score']:.3f}"
+        f"Score:  {result.faithfulness_score:.3f}"
     )
 
-
     # -----------------------------------------------------
-    # 9. Sources
+    # Sources
     # -----------------------------------------------------
 
     print("\nSources:\n")
 
     for i, src in enumerate(
-        response.sources,
+        result.sources,
         1
     ):
 
@@ -193,5 +115,4 @@ while True:
             f"score={src['score']:.3f}"
         )
 
-
-    print("\n" + "=" * 70 + "\n")   
+    print("\n" + "=" * 70 + "\n")
