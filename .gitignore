@@ -70,6 +70,10 @@ Thumbs.db
 *.joblib
 *.faiss
 
+# Faithfulness classifier checkpoints ARE tracked (milestone versions kept
+# on purpose for comparison/rollback — see docs/faithfulness_milestone_v2.md)
+!models/faithfulness_lr*.joblib
+
 # Specific FAISS index filename
 data/processed/faiss.index
 

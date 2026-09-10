@@ -44,6 +44,7 @@ class PipelineResult:
     category: str
     answer: str                        # final, safety-gated answer to show the user
     raw_answer: str                     # what the LLM actually generated, pre-gate
+    context_used: str                   # exact text block checked against the answer
     sources: list[dict[str, Any]]
     model: str
     backend: str
@@ -122,6 +123,7 @@ def run_pipeline(
         category=category,
         answer=final_answer,
         raw_answer=response.answer,
+        context_used=context,
         sources=response.sources,
         model=response.model,
         backend=response.backend,

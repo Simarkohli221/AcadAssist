@@ -82,10 +82,12 @@ DEFAULT_INDEX_DIR = PROJECT_ROOT / "data" / "processed"
 DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "faithfulness_lr.joblib"
 
 # ── Feature order — MUST stay identical between training and prediction ──────
-FEATURE_NAMES: tuple[str, str, str] = (
+FEATURE_NAMES: tuple[str, str, str, str, str] = (
     "semantic_similarity",
     "keyword_jaccard",
     "numeric_consistency",
+    "claim_support_ratio",
+    "minimum_claim_support",
 )
 
 # ── Decision thresholds (PRD §4.7.3) ──────────────────────────────────────────
@@ -186,6 +188,40 @@ def _normalize_text_numbers(text: str) -> str:
     return t
 
 
+# "<N> out of 100" / "<N>/100" (in either word order — a number immediately
+# before the marker, e.g. "40 out of 100", or immediately after via a
+# comparator, e.g. "(out of 100) >= 40") is mathematically identical to
+# "<N>%". Deliberately narrow: only text explicitly framed on a /100 scale
+# gets a derived "%" token — this never promotes an arbitrary bare number
+# (a course credit count, a year, ...) to a percentage.
+_OUT_OF_100_MARKER_RE = re.compile(r"out\s+of\s+(?:a\s+)?100\b|/\s*100\b", re.I)
+_TRAILING_NUMBER_RE = re.compile(r"(\d+(?:\.\d+)?)\s*$")
+_LEADING_NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
+_OUT_OF_100_LOOKAROUND_CHARS = 20
+
+
+def _out_of_100_percent_equivalents(cleaned_text: str) -> set[str]:
+    """
+    Find "<N> out of 100" / "<N>/100" style phrasings (either word order)
+    and return the equivalent "<N>%" tokens, so a percentage stated one way
+    in the answer can match the same value phrased the other way in the
+    context. Additive only — see _numeric_tokens, which keeps the original
+    bare-number tokens too, so an exact match elsewhere is never lost.
+    """
+    equivalents: set[str] = set()
+    for marker in _OUT_OF_100_MARKER_RE.finditer(cleaned_text):
+        before = cleaned_text[max(0, marker.start() - _OUT_OF_100_LOOKAROUND_CHARS):marker.start()]
+        before_match = _TRAILING_NUMBER_RE.search(before)
+        if before_match:
+            equivalents.add(f"{before_match.group(1)}%")
+            continue
+        after = cleaned_text[marker.end():marker.end() + _OUT_OF_100_LOOKAROUND_CHARS]
+        after_match = _LEADING_NUMBER_RE.search(after)
+        if after_match:
+            equivalents.add(f"{after_match.group(0)}%")
+    return equivalents
+
+
 def _numeric_tokens(text: str) -> set[str]:
     """
     Extract normalised numeric tokens from text.
@@ -193,53 +229,91 @@ def _numeric_tokens(text: str) -> set[str]:
     Handles: integers (with/without commas, e.g. 5,000 -> 5000), decimals,
     percentages (50%, 65%), 4-digit years, and 2-digit academic-year ranges.
     Preserves percentage markers to distinguish rates from bare counts.
+
+    Also adds the "%"-equivalent for any "<N> out of 100" / "<N>/100"
+    phrasing found (see _out_of_100_percent_equivalents) — additively, so
+    the original bare-number tokens remain for exact matches elsewhere.
     """
     if not text:
         return set()
     cleaned = _normalize_text_numbers(text)
-    raw = _NUMERIC_RE.findall(cleaned)
-    return set(raw)
+    tokens = set(_NUMERIC_RE.findall(cleaned))
+    tokens |= _out_of_100_percent_equivalents(cleaned)
+    return tokens
+
+
+# Attendance-bracket condition patterns, checked at the level of each
+# individual occurrence (see _extract_condition_rules) rather than once per
+# pre-split "clause".
+_CONDITION_PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
+    ("<50%", re.compile(r"<\s*50%|below\s+50%|less\s+than\s+50%|under\s+50%", re.I)),
+    ("50-65%", re.compile(r"50%?-65%|50%\s*to\s*65%|between\s+50%?\s*and\s*65%", re.I)),
+    ("65-75%", re.compile(r"65%?-75%|65%\s*to\s*75%|between\s+65%?\s*and\s*75%", re.I)),
+    (">=75%", re.compile(r">=?\s*75%|at\s+least\s+75%|75%\s+attendance", re.I)),
+)
+_FEE_RE = re.compile(r"(?:rs|₹|inr|fees?[:\s]*)\s*(\d+)", re.I)
+
+# A local text window is read immediately after each condition occurrence to
+# collect its fee(s)/exam-type — capped so it can't bleed into an unrelated,
+# distant clause (e.g. a different attendance bracket's fee row).
+_CONDITION_WINDOW_CHARS = 120
 
 
 def _extract_condition_rules(text: str) -> dict[str, dict[str, set[str]]]:
     """
-    Extract condition -> {fees: set(), exams: set()} mappings from text clauses.
-    Covers attendance thresholds (<50%, 50-65%, 65-75%, >=75%) and their
-    associated fees and examination types.
+    Extract condition -> {fees: set(), exams: set()} mappings, anchored to
+    EACH individual occurrence of an attendance-bracket phrase rather than
+    to a pre-split "clause".
+
+    WHY occurrence-anchored windows instead of clause-splitting: source
+    tables often render as flattened, unpunctuated text where several
+    attendance brackets and their fees appear back-to-back with no
+    sentence-ending punctuation between rows (real example, examination.pdf
+    Table 1: "...course is 50-65% Rs. 5000/- Rs. 500/-\n(if FF in Re-
+    exam)\nDetained due to...course is 50-65% & Medical Reasons..."). The
+    previous implementation split text into clauses on ". ; ●" and blank
+    lines, then picked ONE condition per clause via if/elif — so a clause
+    spanning several table rows collapsed every number in it onto whichever
+    condition matched first, silently dropping or misattributing fees that
+    legitimately belonged to that same condition (e.g. losing the special-
+    exam fee for the 50-65% bracket entirely, which then made a correct
+    answer citing it look like an unmatched/contradictory number).
+
+    Anchoring to each occurrence of a condition phrase and reading a short,
+    bounded window right after it keeps distant, unrelated numbers out
+    while correctly attributing numbers that genuinely follow that same
+    occurrence, regardless of how the surrounding punctuation is (or isn't)
+    structured.
     """
     cleaned = _normalize_text_numbers(text)
-    # Join line wraps that occur mid-sentence within paragraphs
-    flat = re.sub(r"(?<![.;●\n])\n(?![●\n])", " ", cleaned)
-    clauses = [c.strip() for c in re.split(r"[.;●]|\n{2,}|\band\s+(?=students|if|detained)", flat, flags=re.I) if c.strip()]
+
+    occurrences: list[tuple[int, int, str]] = []
+    for label, pattern in _CONDITION_PATTERNS:
+        for m in pattern.finditer(cleaned):
+            occurrences.append((m.start(), m.end(), label))
+    occurrences.sort(key=lambda o: o[0])
 
     cond_map: dict[str, dict[str, set[str]]] = {}
-    for clause in clauses:
-        cond = None
-        if re.search(r"<\s*50%|below\s+50%|less\s+than\s+50%|under\s+50%", clause, re.I):
-            cond = "<50%"
-        elif re.search(r"50%?-65%|50%\s*to\s*65%|between\s+50%?\s*and\s*65%", clause, re.I):
-            cond = "50-65%"
-        elif re.search(r"65%?-75%|65%\s*to\s*75%|between\s+65%?\s*and\s*75%", clause, re.I):
-            cond = "65-75%"
-        elif re.search(r">=?\s*75%|at\s+least\s+75%|75%\s+attendance", clause, re.I):
-            cond = ">=75%"
-
-        if not cond:
-            continue
+    for i, (_, end, cond) in enumerate(occurrences):
+        next_start = occurrences[i + 1][0] if i + 1 < len(occurrences) else len(cleaned)
+        window_end = min(end + _CONDITION_WINDOW_CHARS, next_start, len(cleaned))
+        window = cleaned[end:window_end]
 
         if cond not in cond_map:
             cond_map[cond] = {"fees": set(), "exams": set()}
 
-        fee_matches = re.findall(r"(?:rs|₹|inr|fees?[:\s]*)\s*(\d+)", clause, re.I)
-        if not fee_matches and re.search(r"\bfee\b|\bcost\b|\bcharges?\b", clause, re.I):
-            fee_matches = [m for m in _NUMERIC_RE.findall(clause) if not m.endswith("%") and len(m) >= 3]
+        fee_matches = list(_FEE_RE.finditer(window))
+        if fee_matches:
+            for fee_match in fee_matches:
+                cond_map[cond]["fees"].add(fee_match.group(1))
+        elif re.search(r"\bfee\b|\bcost\b|\bcharges?\b", window, re.I):
+            for tok in _NUMERIC_RE.findall(window):
+                if not tok.endswith("%") and len(tok) >= 3:
+                    cond_map[cond]["fees"].add(tok)
 
-        for f in fee_matches:
-            cond_map[cond]["fees"].add(f)
-
-        if re.search(r"special\s+exam(?:ination)?", clause, re.I):
+        if re.search(r"special\s+exam(?:ination)?", window, re.I):
             cond_map[cond]["exams"].add("special_exam")
-        elif re.search(r"re-?exam(?:ination)?", clause, re.I):
+        elif re.search(r"re-?exam(?:ination)?", window, re.I):
             cond_map[cond]["exams"].add("re_exam")
 
     return cond_map
@@ -282,6 +356,121 @@ def _check_condition_value_contradiction(answer: str, context: str) -> bool:
     return False
 
 
+# ── Claim-level support (Feature 4/5) ─────────────────────────────────────────
+# semantic_similarity / keyword_jaccard / numeric_consistency are all
+# WHOLE-ANSWER aggregates: a single fabricated claim tacked onto an
+# otherwise-correct, long answer barely moves any of them (confirmed on
+# real adversarial data — category=unsupported_claim, 3/6 missed by the
+# 3-feature model; see data/faithfulness/adversarial_faithfulness_results*.csv).
+# This splits the answer into claim-like units and checks each one
+# individually against the context, instead of scoring the answer as one
+# block.
+
+_MIN_CLAIM_WORDS = 4          # shorter fragments are usually headers/citations, not claims
+_MIN_CONTEXT_UNIT_WORDS = 4
+# Calibrated against data/faithfulness/dataset.csv (the TRAINING corpus —
+# never the held-out adversarial set): sampled 80 KNOWN-supported sentences
+# (pair_type=single_sentence/two_sentence, label=1) and 80 KNOWN-unsupported
+# ones (pair_type=context_mismatch/off_topic, label=0), and computed each
+# one's best-claim-vs-context cosine similarity with this exact code path.
+#   supported:   median=0.880  mean=0.855  p10=0.658  p25=0.760
+#   unsupported: median=0.246  mean=0.249  p75=0.293  p90=0.381  p95=0.459
+# The two distributions are widely and cleanly separated (positive p10 is
+# still well above negative p95). 0.50 sits in the middle of that gap —
+# at this value, 100% of the sampled supported claims are correctly above
+# threshold and only 3% (2/80) of unsupported ones are incorrectly above
+# it. Not a value chosen to force a particular pass/fail outcome on any
+# specific example.
+_CLAIM_SUPPORT_THRESHOLD = 0.50
+
+_BULLET_PREFIX_RE = re.compile(r"^[\-\*•]\s+|^\d+[.\)]\s+")
+_LINE_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z(\d])")
+_MARKDOWN_STRIP_RE = re.compile(r"\*\*|\*|【[^】]*】|\[Source\b[^\]]*\]", re.I)
+_CITATION_LINE_RE = re.compile(r"^\**\s*source\s*[:\-]", re.I)
+
+# Recognises the ABSTENTION PATTERN (not one literal string) — matches
+# generator.NO_ANSWER_RESPONSE exactly, plus the close paraphrases
+# create_faithfulness_dataset.py's _ABSTENTION_ANSWERS trains on, so a
+# genuine refusal is never decomposed into "unsupported claims".
+_ABSTENTION_PATTERN_RE = re.compile(
+    r"could not find this information"
+    r"|cannot verify this from the provided documents"
+    r"|does not contain enough information"
+    r"|does not address this question"
+    r"|not enough information (?:from|in) (?:the |available )?(?:provided )?"
+    r"|not sufficient information from the provided sources"
+    r"|information is not available in the documents"
+    r"|unable to (?:provide|verify)",
+    re.I,
+)
+
+
+def _is_abstention_answer(answer: str) -> bool:
+    """
+    True if `answer` is a safe-refusal response, matched by PATTERN (not a
+    single literal string) so it covers generator.NO_ANSWER_RESPONSE,
+    pipeline.SAFE_ANSWER, and the training-data paraphrases alike.
+
+    Length-gated to short answers (<=40 words): a refusal is a short,
+    self-contained statement. A much longer answer that happens to contain
+    a similar phrase (e.g. "...no fee applies; however the institute could
+    not find grounds to waive the other charge...") should still go through
+    ordinary per-claim evaluation, not be treated as a blanket abstention.
+    """
+    text = (answer or "").strip()
+    if not text or len(text.split()) > 40:
+        return False
+    return bool(_ABSTENTION_PATTERN_RE.search(text))
+
+
+def _split_claim_units(text: str) -> list[str]:
+    """
+    Split text into claim-like units: one per bullet/numbered list line, or
+    one per sentence within a line. Deliberately simple, regex-based (no
+    NLP library) — reused for BOTH the answer (to get claims) and the
+    context (to get comparison units), so both sides are segmented the
+    same way.
+    """
+    if not text:
+        return []
+    units: list[str] = []
+    for line in text.replace("\r\n", "\n").split("\n"):
+        line = line.strip(" \t|")
+        if not line:
+            continue
+        line = _BULLET_PREFIX_RE.sub("", line)
+        for part in _LINE_SENTENCE_SPLIT_RE.split(line):
+            part = part.strip()
+            if part:
+                units.append(part)
+    return units
+
+
+def _clean_claim_text(unit: str) -> str:
+    """Strip markdown emphasis/citation markup so it doesn't pollute the
+    embedding comparison."""
+    cleaned = _MARKDOWN_STRIP_RE.sub("", unit)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" .:-")
+    return cleaned
+
+
+def _content_units(text: str, min_words: int) -> list[str]:
+    """
+    Claim/context comparison units from `text`: split, cleaned of markdown,
+    with citation-only lines ("**Source:** ...") and too-short fragments
+    dropped. Used for both the answer's claims and the context's comparison
+    pool, so a claim is never compared against a bare citation line.
+    """
+    units: list[str] = []
+    for raw in _split_claim_units(text):
+        if _CITATION_LINE_RE.match(raw.strip(" *")):
+            continue
+        cleaned = _clean_claim_text(raw)
+        if len(cleaned.split()) >= min_words:
+            units.append(cleaned)
+    return units
+
+
 # ── Embedder loading (lazy, cached, reused where possible) ───────────────────
 def _load_default_embedder(index_dir: Path):
     """
@@ -310,10 +499,15 @@ class FeatureResult:
     semantic_similarity: float
     keyword_jaccard: float
     numeric_consistency: float
+    claim_support_ratio: float
+    minimum_claim_support: float
 
     def as_list(self) -> list[float]:
         """Fixed-order feature vector — MUST match FEATURE_NAMES order."""
-        return [self.semantic_similarity, self.keyword_jaccard, self.numeric_consistency]
+        return [
+            self.semantic_similarity, self.keyword_jaccard, self.numeric_consistency,
+            self.claim_support_ratio, self.minimum_claim_support,
+        ]
 
     def as_dict(self) -> dict[str, float]:
         return asdict(self)
@@ -512,12 +706,70 @@ class FaithfulnessVerifier:
 
         return 1.0
 
+    # ── Feature 4/5: claim-level support ───────────────────────────────────
+    def claim_support(self, answer: str, context: str) -> tuple[float, float]:
+        """
+        Returns (claim_support_ratio, minimum_claim_support).
+
+        claim_support_ratio = fraction of the answer's substantive claims
+        whose best cosine similarity to any context unit is >=
+        _CLAIM_SUPPORT_THRESHOLD. Unlike semantic_similarity (one score for
+        the whole answer), this checks each claim separately — a single
+        fabricated sentence among several correct ones pulls this feature
+        down sharply even though it barely moves the whole-answer average.
+
+        minimum_claim_support = the single WORST (lowest) best-match score
+        among the answer's claims. Kept as a second, more conservative
+        feature alongside the ratio because they catch different failure
+        shapes: 4 supported claims + 1 fabricated one gives ratio=0.8 (looks
+        fine on average) but minimum flags the fabricated claim directly;
+        conversely minimum alone can't distinguish "1 of 5 claims wrong"
+        from "the only claim is wrong" the way the ratio can. Reporting
+        both, rather than just one, lets the classifier learn to weight
+        each independently instead of forcing a single lossy combination.
+
+        Faithful-abstention handling: if the answer matches the known
+        safe-refusal PATTERN (_is_abstention_answer — not a single literal
+        string), it is never decomposed into claims at all: a refusal
+        asserts nothing, so there is nothing to individually verify.
+        Returns (1.0, 1.0) — a special high-confidence faithful signal,
+        not an ordinary similarity score (which would otherwise be near-
+        zero purely because a short generic refusal shares no vocabulary
+        with any context, faithful or not).
+        """
+        if _is_abstention_answer(answer):
+            return 1.0, 1.0
+
+        claims = _content_units(answer, _MIN_CLAIM_WORDS)
+        if not claims:
+            # No substantive claims to check (e.g. a very short or purely
+            # citation/table-formatting answer) — nothing to contradict,
+            # same "no claim, no penalty" convention as numeric_consistency().
+            return 1.0, 1.0
+
+        context_units = _content_units(context, _MIN_CONTEXT_UNIT_WORDS)
+        if not context_units:
+            # Claims exist but there is nothing to check them against.
+            return 0.0, 0.0
+
+        embedder = self._get_embedder()
+        vectors = embedder.encode_texts(claims + context_units)
+        claim_vecs = vectors[: len(claims)]
+        context_vecs = vectors[len(claims):]
+
+        best_scores = [float(np.max(context_vecs @ cv)) for cv in claim_vecs]
+        supported = sum(1 for s in best_scores if s >= _CLAIM_SUPPORT_THRESHOLD)
+        ratio = supported / len(claims)
+        minimum = min(best_scores)
+        return round(ratio, 6), round(minimum, 6)
+
     # ── Combined feature extraction ──────────────────────────────────────
     def extract_features(self, answer: str, context: str) -> FeatureResult:
         """
-        Compute all three features for a (answer, context) pair.
+        Compute all five features for a (answer, context) pair.
 
-        WHAT: runs semantic_similarity, keyword_jaccard, numeric_consistency.
+        WHAT: runs semantic_similarity, keyword_jaccard, numeric_consistency,
+              claim_support (ratio + minimum).
         WHY: single entry point so training and prediction can never drift
              out of sync on feature order (FEATURE_NAMES is the single
              source of truth for ordering).
@@ -529,10 +781,13 @@ class FaithfulnessVerifier:
         sem = self.semantic_similarity(answer, context)
         jac = self.keyword_jaccard(answer, context)
         num = self.numeric_consistency(answer, context)
+        claim_ratio, claim_min = self.claim_support(answer, context)
         return FeatureResult(
             semantic_similarity=round(sem, 6),
             keyword_jaccard=round(jac, 6),
             numeric_consistency=round(num, 6),
+            claim_support_ratio=claim_ratio,
+            minimum_claim_support=claim_min,
         )
 
     # ── Prediction ────────────────────────────────────────────────────────

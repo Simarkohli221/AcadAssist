@@ -30,6 +30,20 @@ Positive (label=1) example strategies
                              lexical substitution (numbers/entities kept
                              intact), simulating how an LLM would restate
                              (not just copy) supported content.
+  4. faithful_abstention  — a safe-refusal answer ("I cannot verify this
+                             from the provided documents.", etc.) paired
+                             with a chunk from a DIFFERENT, unrelated
+                             source (same selection as context_mismatch
+                             below). An abstention makes no factual claim,
+                             so it is faithful regardless of context — this
+                             specifically covers the real production
+                             scenario where retrieval returns an irrelevant
+                             chunk and the correct behaviour is to decline
+                             rather than fabricate. Added after real-world
+                             validation found the classifier had NEVER seen
+                             this pattern during training and consequently
+                             misclassified every genuine abstention it was
+                             evaluated on.
 
 Negative (label=0) example strategies
 ────────────────────────────────────────
@@ -248,6 +262,24 @@ def _light_paraphrase(sentence: str) -> str:
     return sentence
 
 
+# ── Faithful-abstention answer pool (for the faithful_abstention positive ───
+# class) — safe refusals that make no factual claim, so they are correctly
+# faithful regardless of what context they are paired with. Includes the
+# exact production fallback string (generator.NO_ANSWER_RESPONSE) plus
+# several close paraphrases, so the classifier learns the PATTERN rather
+# than memorising one literal string.
+_ABSTENTION_ANSWERS = [
+    "I could not find this information in the provided documents.",
+    "I cannot verify this from the provided documents.",
+    "The provided context does not contain enough information to answer this.",
+    "The retrieved context does not address this question, so I am unable to provide a verified answer.",
+    "Based on the available context, there is not enough information to answer this question.",
+    "I do not have sufficient information from the provided sources to answer this accurately.",
+    "This information is not available in the documents provided.",
+    "The context provided does not cover this topic, so I cannot give a verified answer.",
+]
+
+
 # ── Off-topic filler pool (for the off_topic negative class) ────────────────
 # Deliberately generic campus-life statements that do NOT originate from,
 # and are not supported by, any institutional document in this corpus.
@@ -344,6 +376,17 @@ def generate_pairs(
             rows.append(
                 _make_row(mismatched_answer, wrong_context_chunk, 0, "context_mismatch")
             )
+
+        # ── POSITIVE 4: faithful abstention + irrelevant/unrelated context ──
+        # A safe refusal makes no factual claim at all, so it is faithful
+        # regardless of the accompanying context — paired with a chunk from
+        # a different source (same `candidates` as context_mismatch above)
+        # to match the real scenario this targets: retrieval returning an
+        # irrelevant chunk, where the correct behaviour is to decline.
+        if candidates:
+            irrelevant_chunk = rng.choice(candidates)
+            abstention = rng.choice(_ABSTENTION_ANSWERS)
+            rows.append(_make_row(abstention, irrelevant_chunk, 1, "faithful_abstention"))
 
         # ── NEGATIVE 2: numeric hallucination, own (correct) context ────────
         if numeric_sentences:

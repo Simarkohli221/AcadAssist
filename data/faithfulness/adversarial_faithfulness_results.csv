@@ -1,0 +1,137 @@
+id,parent_id,category,question,answer,human_faithfulness,mutation_description,verifier_decision,faithfulness_score,semantic_similarity,keyword_jaccard,numeric_consistency
+WN-E07,E07,wrong_number,What is the minimum number of credits and the minimum CGPA required for the award of the B.Tech degree at SPIT?,The institute requires that a B.Tech student **earn at least 180 credits** and achieve a **CGPA of 4.00 or higher** to be eligible for the degree award【Source 1 | examination.pdf | Pages 17‑19】.,0,Changed the minimum B.Tech credit requirement from 160 to 180.,unfaithful,0.018999,0.416395,0.033708,0.0
+WN-T05,T05,wrong_number,"According to the placement demerit table, how many companies' worth of debarment corresponds to 6 demerit points?",The table states that **6 demerit points result in debarment from the next **_**three**_** companies** for which the student is eligible【Source 1 | placement‑policy.pdf | Pages 2‑3】.,0,Changed the company-debarment count for 6 demerit points from five to three.,faithful,0.905595,0.590925,0.047445,1.0
+FA-M02,M02,faithful_abstention,"What is the passing criteria for a course in terms of ESE and overall marks, and what grade is awarded if a student fails to meet it?",I could not find this information in the provided documents.,1,,faithful,0.945176,0.251115,0.0,1.0
+FO-A01,A01,faithful_original,Who chairs the Sports Committee according to the Students' Annual Activity Report 2025-26?,The Sports Committee is chaired by **Harshvardhan Deora**【Source 2 | Document: annual‑report.pdf | Pages 29‑35】.,1,,faithful,0.934724,0.332469,0.018182,1.0
+FO-N03,N03,faithful_original,Within how many days must a student re-register with the exam section after NPTEL results are declared following semester VIII?,"The student must re‑register with the exam section **within 10 days** after the NPTEL results are declared following semester VIII.
+
+**Source:** examination.pdf – Section 3.2 Mid‑Semester Evaluation (MSE), Pages 17‑19 (and also reiterated on Pages 14‑17).",1,,faithful,0.918712,0.718245,0.054313,1.0
+MH-M01,M01,mixed_hallucination,"What attendance percentage must a student maintain during NPTEL re-registration summer term classes, and what minimum score is needed to pass the re-examination?","- **Attendance requirement:** The student must maintain **75 % attendance** in the online/offline summer‑term classes that are taken after re‑registration for the NPTEL course.  
+- **Passing score for re‑examination:** The student must obtain **at least 60 marks out of 100** in the re‑examination to be declared passed.
+
+**Source:** *examination.pdf*, Section 3.2 Mid‑Semester Evaluation (MSE), pages 17‑19.",0,Kept the correct 75% attendance requirement but changed the re-examination passing score from 40 marks to 60 marks out of 100.,unfaithful,0.016171,0.777599,0.08156,0.0
+WC-E01,E01,wrong_condition,What is the minimum attendance percentage a student must maintain to be eligible to appear for the End-Semester Examination?,The regulations state that **a student must have at least 60 % attendance to be eligible to sit for the End‑Semester Examination (ESE)**【Source 2 | examination.pdf | Pages 7‑8 | Section 3.1 In‑Semester Evaluation (ISE)】.,0,Changed the minimum attendance eligibility requirement for the ESE from 75% to 60%.,unfaithful,0.022531,0.518784,0.051282,0.0
+FO-T01,T01,faithful_original,What attendance percentage range requires a student to undergo mandatory training while still being permitted to attend the End-Semester Examination?,The attendance range that still allows a student to sit for the End‑Semester Examination (ESE) but requires the student to report for **mandatory training** afterward is **65 % – 75 % attendance**【Source 1 | examination.pdf | Pages 7‑8】.,1,,faithful,0.898464,0.556961,0.039711,1.0
+WC-N02,N02,wrong_condition,How many credits are equivalent to a 12-week SWAYAM-NPTEL course?,An 8-week SWAYAM-NPTEL course is equivalent to **3 credits**【Source 1 | examination.pdf | Pages 14‑17 | Section 3.2 Mid‑Semester Evaluation (MSE)】.,0,"Changed the referenced course duration from 12-week to 8-week while keeping the 3-credit figure, creating a mismatched condition-to-value pairing (8-week courses are worth 2 credits per the syllabus, not 3).",faithful,0.932294,0.458925,0.04886,1.0
+FA-X01,X01,faithful_abstention,What is the average monthly hostel fee for CSE students at SPIT?,I could not find this information in the provided documents.,1,,faithful,0.943997,0.025618,0.002155,1.0
+WC-M01,M01,wrong_condition,"What attendance percentage must a student maintain during NPTEL re-registration summer term classes, and what minimum score is needed to pass the re-examination?","- **Attendance requirement:** The student must maintain **60 % attendance** in the online/offline summer‑term classes that are taken after re‑registration for the NPTEL course.  
+- **Passing score for re‑examination:** The student must obtain **at least 40 marks out of 100** in the re‑examination to be declared passed.
+
+**Source:** *examination.pdf*, Section 3.2 Mid‑Semester Evaluation (MSE), pages 17‑19.",0,Changed the NPTEL re-registration summer-term attendance requirement from 75% to 60% (the re-examination passing-score claim is left unchanged).,unfaithful,0.015921,0.776557,0.08156,0.0
+WN-N03,N03,wrong_number,Within how many days must a student re-register with the exam section after NPTEL results are declared following semester VIII?,"The student must re‑register with the exam section **within 20 days** after the NPTEL results are declared following semester VIII.
+
+**Source:** examination.pdf – Section 3.2 Mid‑Semester Evaluation (MSE), Pages 17‑19 (and also reiterated on Pages 14‑17).",0,Changed the NPTEL re-registration deadline from 10 days to 20 days.,faithful,0.918691,0.7217,0.054313,1.0
+FO-A03,A03,faithful_original,Who chairs the CSI (Computer Society of India) student chapter according to the annual activity report?,The CSI (Computer Society of India) student chapter is chaired by **Hritani Dinda**【Source 2 | annual‑report.pdf | Pages 29‑35】.,1,,faithful,0.883586,0.310561,0.026087,1.0
+FO-N01,N01,faithful_original,What grade is awarded to a student who scores 86% and above in an NPTEL course?,"A score of **86 % or higher** in an NPTEL (OE/PE/HSS) course is awarded the **AA** grade.
+
+**Source:** examination.pdf, Pages 13‑14 (Table 6 – “Grade Definitions for HSS/NPTEL/…”)【Source 1】.",1,,faithful,0.89514,0.56905,0.038961,1.0
+UC-S02,S02,unsupported_claim,What is the course code for Operating Systems in the Semester IV CSE syllabus?,"The Operating Systems course in Semester IV is listed as:
+
+- **Course Code:** **CS206**  
+
+**Source:** cse‑syllabus.pdf – Semester IV table (Program Core Courses) – Page 4 (also shown on pages 172‑173 and 3‑4). This course carries 4 credits and is taught by the Computer Networks division.",0,"Added unsupported claims about the course's credit count and teaching division, neither of which appear in the retrieved context.",faithful,0.821032,0.541107,0.056604,1.0
+UC-P01,P01,unsupported_claim,"How are companies visiting SPIT for placements categorized based on CTC (Elite, Super Dream, Dream)?","The placement policy groups recruiting companies into three CTC‑based categories:
+
+| Category | Minimum CTC (LPA) |
+|----------|-------------------|
+| **Elite** | > 18 LPA |
+| **Super Dream** | > 9 LPA |
+| **Dream** | > 6 LPA |
+
+These thresholds are defined in the **Training & Placement Policy 2025‑26**, page 1. Additionally, students placed in the Elite category receive a signing bonus of Rs 50,000, as per the policy.",0,"Added an unsupported claim about a Rs.50,000 Elite-category signing bonus, which is not stated anywhere in the placement policy context.",unfaithful,0.011453,0.660015,0.025641,0.0
+FO-T02,T02,faithful_original,What is the fine imposed per paper on a student found taking answer booklets outside the examination room?,"The fine imposed is **Rs 1,000 per paper** for a student who takes answer booklets (used, unused or otherwise) outside the examination room.
+
+**Source:** Examination Regulations, *Table 7 – Malpractice and Punishment*, page 21 (examination.pdf).",1,,faithful,0.877381,0.620233,0.038674,1.0
+WN-P04,P04,wrong_number,What happens to a student who accumulates 8 demerit points during the placement process?,"A student who reaches **10 demerit points** is **disqualified from the placement procedure entirely**.  
+
+**Source:** *placement‑policy.pdf*, Pages 2‑3 (Table showing demerit‑to‑consequence mapping).",0,Changed the demerit-point threshold for placement disqualification from 8 to 10.,unfaithful,0.028884,0.620773,0.039855,0.0
+WF-E06,E06,wrong_fee,What punishment is given to a student caught taking answer booklets outside the examination room?,"The student will be **awarded an FF grade in that course and fined Rs 3,000 per paper**.
+
+*Source: “examination.pdf”, Table 7 – Mid‑Semester Evaluation (MSE), pages 21 (Section 3.2) and pages 19‑21 (Section 3.2).*",0,"Changed the malpractice fine from Rs.1,000 to Rs.3,000 per paper.",unfaithful,0.014761,0.537599,0.037736,0.0
+FO-E01,E01,faithful_original,What is the minimum attendance percentage a student must maintain to be eligible to appear for the End-Semester Examination?,The regulations state that **a student must have at least 75 % attendance to be eligible to sit for the End‑Semester Examination (ESE)**【Source 2 | examination.pdf | Pages 7‑8 | Section 3.1 In‑Semester Evaluation (ISE)】.,1,,faithful,0.91163,0.514187,0.051282,1.0
+UC-P04,P04,unsupported_claim,What happens to a student who accumulates 8 demerit points during the placement process?,"A student who reaches **8 demerit points** is **disqualified from the placement procedure entirely**.  
+
+**Source:** *placement‑policy.pdf*, Pages 2‑3 (Table showing demerit‑to‑consequence mapping). Such students also forfeit any Pre-Placement Offer (PPO) they may have already received.",0,Added an unsupported claim about PPO forfeiture that is not stated in the demerit-consequence context.,faithful,0.866877,0.634665,0.057554,1.0
+FA-X03,X03,faithful_abstention,Who is the current Vice-Chancellor of the University of Mumbai?,I could not find this information in the provided documents.,1,,faithful,0.945443,0.309177,0.001969,1.0
+WF-E03,E03,wrong_fee,What is the special examination fee for a student detained due to attendance below 50% in a course (non-medical)?,"The special‑examination fee for a student who is detained because his/her attendance is **below 50 %** (and not due to medical reasons) is **₹ 6,000**.
+
+**Source:** *examination.pdf*, Pages 7‑8 (Section 3.1 – Examination fee structure).",0,"Changed the below-50% special examination fee from Rs.8,000 to Rs.6,000.",unfaithful,0.025097,0.777384,0.054054,0.0
+MH-E07,E07,mixed_hallucination,What is the minimum number of credits and the minimum CGPA required for the award of the B.Tech degree at SPIT?,The institute requires that a B.Tech student **earn at least 160 credits** and achieve a **CGPA of 5.00 or higher** to be eligible for the degree award【Source 1 | examination.pdf | Pages 17‑19】.,0,Kept the correct 160-credit requirement but changed the minimum CGPA for degree award from 4.00 to 5.00.,unfaithful,0.018919,0.41522,0.033708,0.0
+UC-A02,A02,unsupported_claim,Who chairs the E-Cell committee according to the Students' Annual Activity Report 2025-26?,The E‑Cell committee is chaired by **Harsh Malpani**【Source 1 | annual‑report.pdf | Pages 29‑35】. The E-Cell committee currently has 25 active student members.,0,Added an unsupported membership-count claim not present in the annual activity report context.,uncertain,0.567087,0.358572,0.016949,1.0
+WC-N04,N04,wrong_condition,"What is the minimum assignment and final exam score a student must achieve to pass an NPTEL course, as declared by NPTEL?","The NPTEL passing criteria state that a learner must obtain  
+
+* **Assignment:** at least **50 %** (i.e., ≥ 40",0,Changed the NPTEL assignment-score passing threshold from 40% to 50%.,faithful,0.863392,0.523751,0.019417,1.0
+WC-S01,S01,wrong_condition,What is the minimum CGPA required for a CSE student to enroll in the Honors by Research program?,"The minimum CGPA required for a Computer Science Engineering student to enroll in the **Honors by Research** program is **7.00**.
+
+- **Source:** *cse‑syllabus.pdf*, Section 7 (page 4) – “For Enrollment to Honors by research Minimum CGPA must be 8.25.”  
+- **Source:** *cse‑syllabus.pdf*, Section 9 (pages 172‑173) – “For Enrollment to Honors by research Minimum CGPA must be",0,Changed the Honors by Research minimum CGPA requirement from 8.25 to 7.00 (the quoted source citation later in the answer is left unchanged).,unfaithful,0.02541,0.460391,0.045326,0.0
+WN-N01,N01,wrong_number,What grade is awarded to a student who scores 86% and above in an NPTEL course?,"A score of **96 % or higher** in an NPTEL (OE/PE/HSS) course is awarded the **AA** grade.
+
+**Source:** examination.pdf, Pages 13‑14 (Table 6 – “Grade Definitions for HSS/NPTEL/…”)【Source 1】.",0,Changed the NPTEL AA-grade cutoff from 86% to 96%.,unfaithful,0.019702,0.577187,0.038961,0.0
+WN-S04,S04,wrong_number,How many credits are allocated to the Program Core Courses group in Semester IV of the CSE syllabus?,The Program Core Courses group in Semester IV carries **16 credits**【Source 1 | cse‑syllabus.pdf | Pages 4‑4】.,0,Changed the Semester IV Program Core Courses credit count from 12 to 16.,unfaithful,0.013527,0.605849,0.033003,0.0
+UC-N03,N03,unsupported_claim,Within how many days must a student re-register with the exam section after NPTEL results are declared following semester VIII?,"The student must re‑register with the exam section **within 10 days** after the NPTEL results are declared following semester VIII.
+
+**Source:** examination.pdf – Section 3.2 Mid‑Semester Evaluation (MSE), Pages 17‑19 (and also reiterated on Pages 14‑17). This rule was introduced starting the 2024-25 academic year.",0,"Added an unsupported claim about when the rule was introduced, which the context does not state.",unfaithful,0.010732,0.727444,0.060127,0.0
+MH-P01,P01,mixed_hallucination,"How are companies visiting SPIT for placements categorized based on CTC (Elite, Super Dream, Dream)?","The placement policy groups recruiting companies into three CTC‑based categories:
+
+| Category | Minimum CTC (LPA) |
+|----------|-------------------|
+| **Elite** | > 18 LPA |
+| **Super Dream** | > 9 LPA |
+| **Dream** | > 4 LPA |
+
+These thresholds are defined in the **Training & Placement Policy 2025‑26**, page 1.",0,Kept the correct Elite (>18 LPA) and Super Dream (>9 LPA) thresholds but changed the Dream category threshold from >6 LPA to >4 LPA.,unfaithful,0.05019,0.669081,0.025943,0.25
+WF-P05,P05,wrong_fee,What minimum increase in CTC is required for a student to be permitted to jump to a higher placement category?,"The policy states that a student may move to a higher‑category recruiter only when the offered CTC is **at least ₹5 lakh higher** than the current offer.
+
+- **Source:** *placement‑policy.pdf*, Page 1‑2 (Section) – “A Jump to a higher category company is permitted only if there is an increase of at least 3 Lacs in CTC of the next company.”
+- **Source:** *placement‑policy.pdf*, Page 1‑1 (Section) – same wording confirming the 3‑lakh minimum increase.",0,Changed the minimum CTC increase required to jump placement categories from Rs.3 lakh to Rs.5 lakh (the quoted source citations are left unchanged).,unfaithful,0.010535,0.652719,0.06383,0.0
+WF-E02,E02,wrong_fee,What is the re-examination fee for a student detained due to 50-65% attendance in a course?,"The re‑examination fee for a student who is detained because his/her attendance is **50 % – 65 %** in a course is **₹ 3,000** (with an additional ₹ 500 only if the student has a “FF” grade in the re‑exam).
+
+**Source:** *examination.pdf*, Pages 7‑8 (Section 3.1 – In‑Semester Evaluation & Examination fee structure).",0,"Changed the 50-65% attendance re-examination fee from Rs.5,000 to Rs.3,000 (the Rs.500 special-exam caveat is left unchanged).",unfaithful,0.027607,0.778654,0.062271,0.0
+MH-M04,M04,mixed_hallucination,What is the examination fee for a regular re-examination versus a malpractice special examination?,"- **Regular re‑examination fee:** Rs. 1,500 per course (when a student has failed the regular End‑Semester Examination).  
+- **Malpractice special‑examination fee:** Rs. 8 000 per course (when a student is required to sit a special exam because of malpractice).
+
+**Source:** *examination.pdf*,",0,"Kept the correct malpractice fee (Rs.8,000) but changed the regular re-examination fee from Rs.500 to Rs.1,500.",unfaithful,0.015431,0.790314,0.041237,0.0
+FA-E04,E04,faithful_abstention,What happens to a student whose attendance in a course is between 65% and 75%?,I could not find this information in the provided documents.,1,,faithful,0.945365,0.288478,0.0,1.0
+MH-E06,E06,mixed_hallucination,What punishment is given to a student caught taking answer booklets outside the examination room?,"The student will be **awarded an FF grade in that course and fined Rs 5,000 per paper**.
+
+*Source: “examination.pdf”, Table 7 – Mid‑Semester Evaluation (MSE), pages 21 (Section 3.2) and pages 19‑21 (Section 3.2).*",0,"Kept the correct FF-grade penalty but changed the malpractice fine from Rs.1,000 to Rs.5,000 per paper.",unfaithful,0.014574,0.536743,0.037736,0.0
+MH-P06,P06,mixed_hallucination,What formal attire is required for students during the placement recruitment process?,"The policy states that, during the placement recruitment process, students must wear:
+
+1. **Formal light‑coloured shirts**  
+2. **Formal sneakers**  
+3. **Formal trousers**  
+
+*Source: placement‑policy.pdf, Pages 2‑3.*",0,"Kept the correct shirt and trousers requirements but changed 'formal shoes and a belt' to 'formal sneakers', contradicting the dress-code context.",faithful,0.883225,0.460534,0.047273,1.0
+FO-E05,E05,faithful_original,What is the examination fee for a grade improvement examination per course?,"The fee for a **grade‑improvement examination is Rs. 1,000 per course**.
+
+**Source:** Examination Regulations, *examination.pdf*, Pages 7‑8 (Section 3.1 – In‑Semester Evaluation).",1,,faithful,0.927014,0.674231,0.034921,1.0
+WC-T01,T01,wrong_condition,What attendance percentage range requires a student to undergo mandatory training while still being permitted to attend the End-Semester Examination?,The attendance range that still allows a student to sit for the End‑Semester Examination (ESE) but requires the student to report for **mandatory training** afterward is **55 % - 65 % attendance**【Source 1 | examination.pdf | Pages 7‑8】.,0,Changed the mandatory-training attendance range from 65-75% to 55-65%.,unfaithful,0.020435,0.563227,0.039711,0.0
+WF-M04,M04,wrong_fee,What is the examination fee for a regular re-examination versus a malpractice special examination?,"- **Regular re‑examination fee:** Rs. 500 per course (when a student has failed the regular End‑Semester Examination).  
+- **Malpractice special‑examination fee:** Rs. 4 000 per course (when a student is required to sit a special exam because of malpractice).
+
+**Source:** *examination.pdf*,",0,"Changed the malpractice special-examination fee from Rs.8,000 to Rs.4,000 (the regular re-examination fee of Rs.500 is left unchanged).",unfaithful,0.016205,0.794679,0.041237,0.0
+FO-P02,P02,faithful_original,"How many attempts is a student allowed to appear for a higher placement category after securing an offer, excluding the Elite category?","A student may make **up to three attempts** to move to a higher placement category after securing an offer (the Elite category is the only exception where unlimited attempts are allowed).  
+
+**Source:** *Training & Placement Policy 2025‑26*, placement‑policy.pdf – Pages 1‑2 (and reiterated on Page 1‑1).",1,,faithful,0.873606,0.704653,0.043614,1.0
+WF-E05,E05,wrong_fee,What is the examination fee for a grade improvement examination per course?,"The fee for a **grade‑improvement examination is Rs. 2,500 per course**.
+
+**Source:** Examination Regulations, *examination.pdf*, Pages 7‑8 (Section 3.1 – In‑Semester Evaluation).",0,"Changed the grade-improvement examination fee from Rs.1,000 to Rs.2,500.",unfaithful,0.028684,0.681092,0.034921,0.0
+FO-P04,P04,faithful_original,What happens to a student who accumulates 8 demerit points during the placement process?,"A student who reaches **8 demerit points** is **disqualified from the placement procedure entirely**.  
+
+**Source:** *placement‑policy.pdf*, Pages 2‑3 (Table showing demerit‑to‑consequence mapping).",1,,faithful,0.934194,0.622775,0.039855,1.0
+FO-S04,S04,faithful_original,How many credits are allocated to the Program Core Courses group in Semester IV of the CSE syllabus?,The Program Core Courses group in Semester IV carries **12 credits**【Source 1 | cse‑syllabus.pdf | Pages 4‑4】.,1,,faithful,0.860399,0.5948,0.033003,1.0
+FA-N06,N06,faithful_abstention,What must a student do if they fail to complete an NPTEL course successfully?,I could not find this information in the provided documents.,1,,faithful,0.945462,0.307821,0.0,1.0
+FA-A04,A04,faithful_abstention,How many hackathons are reported in the Students' Annual Activity Report 2025-26?,I could not find this information in the provided documents.,1,,faithful,0.944878,0.196477,0.001645,1.0
+FA-X02,X02,faithful_abstention,What is the Wi-Fi password for the SPIT campus network?,I could not find this information in the provided documents.,1,,faithful,0.943979,0.021256,0.001873,1.0
+FO-E03,E03,faithful_original,What is the special examination fee for a student detained due to attendance below 50% in a course (non-medical)?,"The special‑examination fee for a student who is detained because his/her attendance is **below 50 %** (and not due to medical reasons) is **₹ 8,000**.
+
+**Source:** *examination.pdf*, Pages 7‑8 (Section 3.1 – Examination fee structure).",1,,faithful,0.917593,0.781915,0.054054,1.0
+FO-S02,S02,faithful_original,What is the course code for Operating Systems in the Semester IV CSE syllabus?,"The Operating Systems course in Semester IV is listed as:
+
+- **Course Code:** **CS206**  
+
+**Source:** cse‑syllabus.pdf – Semester IV table (Program Core Courses) – Page 4 (also shown on pages 172‑173 and 3‑4).",1,,faithful,0.821279,0.530566,0.045802,1.0
+UC-T02,T02,unsupported_claim,What is the fine imposed per paper on a student found taking answer booklets outside the examination room?,"The fine imposed is **Rs 1,000 per paper** for a student who takes answer booklets (used, unused or otherwise) outside the examination room.
+
+**Source:** Examination Regulations, *Table 7 – Malpractice and Punishment*, page 21 (examination.pdf). The student is also barred from appearing in that semester's practical examinations.",0,Added an unsupported claim about a practical-exam ban that is not stated in the malpractice/punishment context.,faithful,0.877739,0.667694,0.043836,1.0
