@@ -6,7 +6,7 @@ LLM generation layer for the RAKA RAG pipeline.
 v3 Changes
 ──────────
 • Increased MAX_CONTEXT_CHARS from 6000 → 12000 (fixes truncated context).
-• Upgraded default Groq model to llama-3.3-70b-versatile for better quality.
+• Uses the current Groq production model openai/gpt-oss-120b by default.
 • Richer system prompt: lists all known SPIT document types so the LLM knows
   what it has access to.
 • Context block now includes ALL chunks (not just first 2000 chars of first).
@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 GROQ_API_URL    = "https://api.groq.com/openai/v1/chat/completions"
 OPENAI_API_URL  = "https://api.openai.com/v1/chat/completions"
 
-DEFAULT_GROQ_MODEL   = "llama-3.3-70b-versatile"   # upgraded from 8b-instant
+DEFAULT_GROQ_MODEL   = "openai/gpt-oss-120b"
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 
 TEMPERATURE       = 0.1

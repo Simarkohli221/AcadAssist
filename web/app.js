@@ -1,6 +1,32 @@
 const chatLog = document.getElementById("chatLog");
 const chatForm = document.getElementById("chatForm");
 const questionInput = document.getElementById("questionInput");
+const accountName = document.getElementById("accountName");
+const logoutButton = document.getElementById("logoutButton");
+
+const sessionReady = fetch("/api/auth/me")
+  .then(async (response) => {
+    if (!response.ok) {
+      window.location.replace("/auth");
+      return false;
+    }
+    const data = await response.json();
+    accountName.textContent = data.user.full_name;
+    return true;
+  })
+  .catch(() => {
+    window.location.replace("/auth");
+    return false;
+  });
+
+logoutButton.addEventListener("click", async () => {
+  logoutButton.disabled = true;
+  try {
+    await fetch("/api/auth/logout", { method: "POST" });
+  } finally {
+    window.location.replace("/auth");
+  }
+});
 
 const addMessage = (type, title, body, sources = []) => {
   const wrapper = document.createElement("div");
@@ -54,6 +80,7 @@ const setThinking = (value) => {
 
 chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!(await sessionReady)) return;
   const question = questionInput.value.trim();
   if (!question) return;
 

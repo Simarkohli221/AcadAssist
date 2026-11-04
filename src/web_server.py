@@ -11,9 +11,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -23,6 +23,13 @@ from generator import Generator
 from faithfulness import FaithfulnessVerifier
 from reranker import get_reranker
 from pipeline import run_pipeline
+from auth import (
+    get_current_user,
+    get_optional_user,
+    initialize_auth_db,
+    router as auth_router,
+    sanitized_validation_error,
+)
 
 logger = logging.getLogger("raka.web")
 logging.basicConfig(
@@ -37,9 +44,9 @@ DEFAULT_INDEX_DIR = APP_ROOT / "data" / "processed"
 INDEX_DIR = Path(os.getenv("RAKA_INDEX_DIR", DEFAULT_INDEX_DIR))
 
 app = FastAPI(title="RAKA Web", version="1.0.0")
-
-if WEB_DIR.exists():
-    app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+app.add_exception_handler(RequestValidationError, sanitized_validation_error)
+app.include_router(auth_router)
+STATIC_ASSETS = {"app.js", "styles.css", "auth.js", "auth.css"}
 
 
 class ChatRequest(BaseModel):
@@ -93,19 +100,39 @@ def _load_components() -> None:
 
 @app.on_event("startup")
 def startup_event() -> None:
+    initialize_auth_db()
     _load_components()
 
 
 @app.get("/")
-def index() -> FileResponse:
+def index(user: dict[str, object] | None = Depends(get_optional_user)) -> Response:
+    if user is None:
+        return RedirectResponse("/auth", status_code=303)
     index_file = WEB_DIR / "index.html"
     if not index_file.exists():
         raise HTTPException(status_code=404, detail="UI not found")
     return FileResponse(index_file)
 
 
+@app.get("/auth")
+def auth_page(user: dict[str, object] | None = Depends(get_optional_user)) -> Response:
+    if user is not None:
+        return RedirectResponse("/", status_code=303)
+    auth_file = WEB_DIR / "auth.html"
+    if not auth_file.exists():
+        raise HTTPException(status_code=404, detail="Authentication UI not found")
+    return FileResponse(auth_file)
+
+
+@app.get("/static/{asset_name}")
+def static_asset(asset_name: str) -> FileResponse:
+    if asset_name not in STATIC_ASSETS:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return FileResponse(WEB_DIR / asset_name)
+
+
 @app.post("/api/chat", response_model=ChatResponse)
-def chat(payload: ChatRequest) -> ChatResponse:
+def chat(payload: ChatRequest, user: dict[str, object] = Depends(get_current_user)) -> ChatResponse:
     question = payload.question.strip()
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty")
